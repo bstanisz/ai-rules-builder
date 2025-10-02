@@ -1,7 +1,13 @@
 import type { RulesGenerationStrategy } from '../RulesGenerationStrategy.ts';
 import { Layer, Library, Stack } from '../../../data/dictionaries.ts';
 import type { RulesContent } from '../RulesBuilderTypes.ts';
-import { getRulesForLibrary } from '../../../data/rules.ts';
+import {
+  createProjectMarkdown,
+  createEmptyStateMarkdown,
+  formatLayerHeader,
+  formatStackHeader,
+  formatLibrarySection,
+} from './shared-builders.ts';
 
 /**
  * Strategy for single-file rules generation
@@ -14,16 +20,11 @@ export class SingleFileRulesStrategy implements RulesGenerationStrategy {
     stacksByLayer: Record<Layer, Stack[]>,
     librariesByStack: Record<Stack, Library[]>,
   ): RulesContent[] {
-    const projectMarkdown = `# AI Rules for ${projectName}\n\n${projectDescription}\n\n`;
-    const noSelectedLibrariesMarkdown = `---\n\n👈 Use the Rule Builder on the left or drop dependency file here`;
-    const projectLabel = 'Project',
-      projectFileName = 'project.mdc';
-
-    let markdown = projectMarkdown;
+    let markdown = createProjectMarkdown(projectName, projectDescription);
 
     if (selectedLibraries.length === 0) {
-      markdown += noSelectedLibrariesMarkdown;
-      return [{ markdown, label: projectLabel, fileName: projectFileName }];
+      markdown += createEmptyStateMarkdown();
+      return [{ markdown, label: 'Project', fileName: 'project.mdc' }];
     }
 
     markdown += this.generateLibraryMarkdown(stacksByLayer, librariesByStack);
@@ -36,29 +37,16 @@ export class SingleFileRulesStrategy implements RulesGenerationStrategy {
   ): string {
     let markdown = '';
 
-    // Generate content for each layer and its stacks
     Object.entries(stacksByLayer).forEach(([layer, stacks]) => {
-      markdown += `## ${layer}\n\n`;
+      markdown += formatLayerHeader(layer);
 
       stacks.forEach((stack) => {
-        markdown += `### Guidelines for ${stack}\n\n`;
+        markdown += formatStackHeader(stack);
 
         const libraries = librariesByStack[stack];
         if (libraries) {
           libraries.forEach((library) => {
-            markdown += `#### ${library}\n\n`;
-
-            // Get specific rules for this library
-            const libraryRules = getRulesForLibrary(library);
-            if (libraryRules.length > 0) {
-              libraryRules.forEach((rule) => {
-                markdown += `- ${rule}\n`;
-              });
-            } else {
-              markdown += `- Use ${library} according to best practices\n`;
-            }
-
-            markdown += '\n';
+            markdown += formatLibrarySection(library);
           });
         }
 

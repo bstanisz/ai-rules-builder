@@ -1,8 +1,14 @@
 import type { RulesGenerationStrategy } from '../RulesGenerationStrategy.ts';
 import { Layer, type Library, Stack } from '../../../data/dictionaries.ts';
 import type { RulesContent } from '../RulesBuilderTypes.ts';
-import { getRulesForLibrary } from '../../../data/rules';
 import { slugify } from '../../../utils/slugify.ts';
+import {
+  createProjectMarkdown,
+  createEmptyStateMarkdown,
+  createLibraryRulesMarkdown,
+  formatLayerHeader,
+  formatStackHeader,
+} from './shared-builders.ts';
 
 /**
  * Strategy for multi-file rules generation
@@ -15,31 +21,24 @@ export class MultiFileRulesStrategy implements RulesGenerationStrategy {
     stacksByLayer: Record<Layer, Stack[]>,
     librariesByStack: Record<Stack, Library[]>,
   ): RulesContent[] {
-    const projectMarkdown = `# AI Rules for ${projectName}\n\n${projectDescription}\n\n`;
-    const noSelectedLibrariesMarkdown = `---\n\n👈 Use the Rule Builder on the left or drop dependency file here`;
-    const projectLabel = 'Project',
-      projectFileName = 'project.mdc';
-
     const markdowns: RulesContent[] = [];
-
-    markdowns.push({ markdown: projectMarkdown, label: projectLabel, fileName: projectFileName });
+    const projectMarkdown = createProjectMarkdown(projectName, projectDescription);
 
     if (selectedLibraries.length === 0) {
-      markdowns[0].markdown += noSelectedLibrariesMarkdown;
+      markdowns.push({
+        markdown: projectMarkdown + createEmptyStateMarkdown(),
+        label: 'Project',
+        fileName: 'project.mdc',
+      });
       return markdowns;
     }
+
+    markdowns.push({ markdown: projectMarkdown, label: 'Project', fileName: 'project.mdc' });
 
     Object.entries(stacksByLayer).forEach(([layer, stacks]) => {
       stacks.forEach((stack) => {
         librariesByStack[stack].forEach((library) => {
-          markdowns.push(
-            this.buildRulesContent({
-              layer,
-              stack,
-              library,
-              libraryRules: getRulesForLibrary(library),
-            }),
-          );
+          markdowns.push(this.buildRulesContent({ layer, stack, library }));
         });
       });
     });
@@ -48,39 +47,19 @@ export class MultiFileRulesStrategy implements RulesGenerationStrategy {
   }
 
   private buildRulesContent({
-    libraryRules,
     layer,
     stack,
     library,
   }: {
-    libraryRules: string[];
     layer: string;
-    stack: string;
-    library: string;
+    stack: Stack;
+    library: Library;
   }): RulesContent {
     const label = `${layer} - ${stack} - ${library}`;
     const fileName: RulesContent['fileName'] = `${slugify(`${layer}-${stack}-${library}`)}.mdc`;
-    const content =
-      libraryRules.length > 0
-        ? `${libraryRules.map((rule) => `- ${rule}`).join('\n')}`
-        : `- Use ${library} according to best practices`;
-    const markdown = this.renderRuleMarkdown({ content, layer, stack, library });
+    const content = createLibraryRulesMarkdown(library);
+    const markdown =
+      formatLayerHeader(layer) + formatStackHeader(stack) + `#### ${library}\n\n${content}\n\n`;
     return { markdown, label, fileName };
   }
-
-  private renderRuleMarkdown = ({
-    content,
-    layer,
-    stack,
-    library,
-  }: {
-    content: string;
-    layer: string;
-    stack: string;
-    library: string;
-  }) =>
-    `## ${layer}\n\n### Guidelines for ${stack}\n\n#### ${library}\n\n{{content}}\n\n`.replace(
-      '{{content}}',
-      content,
-    );
 }
